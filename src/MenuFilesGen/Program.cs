@@ -6,13 +6,26 @@ namespace MenuFilesGen
 {
     internal static class Program
     {
+        public static XElement CreateButton(string[] commandData)
+        {
+            var ribbonCommandButton = new XElement("RibbonCommandButton");
+            ribbonCommandButton.Add(new XAttribute("Text", commandData[0]));
+            ribbonCommandButton.Add(new XAttribute("ButtonStyle", commandData[4]));
+            ribbonCommandButton.Add(new XAttribute("MenuMacroID", commandData[1]));
+            return ribbonCommandButton;
+        }
+
         /// <summary>
-        ///  The main entry point for the application.
+        ///     The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
-            OpenFileDialog tableFileDialog = new OpenFileDialog() { Filter = "TSV files (*.tsv)|*.tsv" };
+            OpenFileDialog tableFileDialog = new OpenFileDialog
+            {
+                Filter = "TSV files (*.tsv)|*.tsv",
+            };
+
             if (tableFileDialog.ShowDialog() != DialogResult.OK)
                 return;
 
@@ -41,45 +54,40 @@ namespace MenuFilesGen
             {
                 // Регистрация команд
                 writer.WriteLine(
-                    $"[\\ribbon\\{addinName}]" +
-                    $"\r\nCUIX=s%CFG_PATH%\\{addinName}.cuix" +
-                    "\r\n" +
-                    "\r\n[\\configman]" +
-                    "\r\n[\\configman\\commands]");
+                    $"[\\ribbon\\{addinName}]"
+                    + $"\r\nCUIX=s%CFG_PATH%\\{addinName}.cuix"
+                    + "\r\n"
+                    + "\r\n[\\configman]"
+                    + "\r\n[\\configman\\commands]");
 
                 foreach (IGrouping<string, string[]> commandGroup in commands)
                 {
                     foreach (string[] commandData in commandGroup)
                     {
                         writer.WriteLine(
-                            $@"[\configman\commands\{commandData[1]}]" +
-                            $"\r\nweight=i10" +
-                            $"\r\ncmdtype=i1" +
-                            $"\r\nintername=s{commandData[1]}" +
-                            $"\r\nDispName=s{commandData[0]}" +
-                            $"\r\nStatusText=s{commandData[2]}" +
-                            $"\r\nBitmapDll=sicons\\{commandData[1]}.ico");
+                            $@"[\configman\commands\{commandData[1]}]"
+                            + $"\r\nweight=i10"
+                            + $"\r\ncmdtype=i1"
+                            + $"\r\nintername=s{commandData[1]}"
+                            + $"\r\nDispName=s{commandData[0]}"
+                            + $"\r\nStatusText=s{commandData[2]}"
+                            + $"\r\nBitmapDll=sicons\\{commandData[1]}.ico");
                     }
                 }
 
                 // Классическое меню
-                writer.WriteLine(
-                    "\r\n[\\menu]" +
-                    $"\r\n[\\menu\\{addinName}_Menu]" +
-                    $"\r\nName=s{addinName}");
+                writer.WriteLine("\r\n[\\menu]" + $"\r\n[\\menu\\{addinName}_Menu]" + $"\r\nName=s{addinName}");
 
                 foreach (IGrouping<string, string[]> commandGroup in commands)
                 {
-                    writer.WriteLine(
-                        $@"[\menu\{addinName}_Menu\{commandGroup.Key}]" +
-                        $"\r\nname=s{commandGroup.Key}");
+                    writer.WriteLine($@"[\menu\{addinName}_Menu\{commandGroup.Key}]" + $"\r\nname=s{commandGroup.Key}");
 
                     foreach (string[] commandData in commandGroup)
                     {
                         writer.WriteLine(
-                            $@"[\menu\{addinName}_Menu\{commandGroup.Key}\s{commandData[1]}]" +
-                            $"\r\nname=s{commandData[0]}" +
-                            $"\r\nIntername=s{commandData[1]}");
+                            $@"[\menu\{addinName}_Menu\{commandGroup.Key}\s{commandData[1]}]"
+                            + $"\r\nname=s{commandData[0]}"
+                            + $"\r\nIntername=s{commandData[1]}");
                     }
                 }
 
@@ -89,15 +97,13 @@ namespace MenuFilesGen
                 foreach (IGrouping<string, string[]> commandGroup in commands)
                 {
                     var panelName = $"{addinName}_{commandGroup.Key}";
-                    writer.WriteLine($"[\\toolbars\\{panelName}]" +
-                            $"\r\nname=s{panelName}" +
-                            $"\r\nIntername=s{panelName}");
+                    writer.WriteLine(
+                        $"[\\toolbars\\{panelName}]" + $"\r\nname=s{panelName}" + $"\r\nIntername=s{panelName}");
 
                     foreach (string[] commandData in commandGroup)
                     {
                         writer.WriteLine(
-                            $"[\\toolbars\\{panelName}\\{commandData[1]}]" +
-                            $"\r\nIntername=s{commandData[1]}");
+                            $"[\\toolbars\\{panelName}\\{commandData[1]}]" + $"\r\nIntername=s{commandData[1]}");
                     }
                 }
             }
@@ -105,6 +111,7 @@ namespace MenuFilesGen
             // Ленточное меню
             //Создание XML документа 
             var xDoc = new XDocument();
+
             //Корневой элемент
             var ribbonRoot = new XElement("RibbonRoot");
             xDoc.Add(ribbonRoot);
@@ -153,7 +160,8 @@ namespace MenuFilesGen
 
                 var sortedButtons = panelButtons
                     .Elements()
-                    .GroupBy(button => button.Attributes().First(attr => attr.Name == "ButtonStyle").Value.Contains("Small"))
+                    .GroupBy(
+                        button => button.Attributes().First(attr => attr.Name == "ButtonStyle").Value.Contains("Small"))
                     .ToDictionary(g => g.Key);
 
                 if (sortedButtons.ContainsKey(false))
@@ -184,6 +192,53 @@ namespace MenuFilesGen
                     }
                 }
 
+                // Дублирование
+                XElement ribbonPanelBreak = new XElement("RibbonPanelBreak");
+                ribbonPanelSource.Add(ribbonPanelBreak);
+                var ribbonRowDuplicatePanel = new XElement("RibbonRowPanel");
+                ribbonPanelSource.Add(ribbonRowDuplicatePanel);
+
+                var items = panelButtons.Elements().ToArray();
+                int nameSymbolsCountMax = 0;
+
+                for (int itemIndex = 0; itemIndex < items.Count(); itemIndex += 2)
+                {
+                    var nameSymbolsCount =
+                        items[itemIndex].Attributes().First(attr => attr.Name == "Text").Value.Count();
+
+                    if (nameSymbolsCount > nameSymbolsCountMax)
+                        nameSymbolsCountMax = nameSymbolsCount;
+                }
+
+                for (int itemIndex = 0; itemIndex < items.Count(); itemIndex++)
+                {
+                    var item = items[itemIndex];
+                    XElement[] itemButtons;
+
+                    if (item.Name == "RibbonSplitButton")
+                        itemButtons = item.Elements().ToArray();
+                    else
+                    {
+                        itemButtons = new[]
+                        {
+                            item,
+                        };
+                    }
+
+                    for (int buttonIndex = 0; buttonIndex < itemButtons.Count(); buttonIndex++)
+                    {
+                        var button = itemButtons[buttonIndex];
+                        button.Attributes().First(attr => attr.Name == "ButtonStyle").Value = "LargeWithHorizontalText";
+                        ribbonRowDuplicatePanel.Add(button);
+
+                        if (itemIndex < items.Count() - 1 || buttonIndex < itemButtons.Count() - 1)
+                        {
+                            XElement separator = new XElement("RibbonSeparator");
+                            ribbonRowDuplicatePanel.Add(separator);
+                        }
+                    }
+                }
+
                 var ribbonPanelSourceReference = new XElement("RibbonPanelSourceReference");
                 ribbonPanelSourceReference.Add(new XAttribute("PanelId", commandGroup.Key));
                 ribbonTabSource.Add(ribbonPanelSourceReference);
@@ -197,20 +252,9 @@ namespace MenuFilesGen
 
             // Создание архива (.cuix), добавление в него сформированного .xml файла
             using (var zip = ZipFile.Open(cuixFilePath, ZipArchiveMode.Create))
-            {
                 zip.CreateEntryFromFile(cuiFilePath, "RibbonRoot.cui");
-            }
 
             MessageBox.Show($"Файлы {addinName}.cfg и {addinName}.cuix сохранены в папке {directoryPath}");
-        }
-
-        public static XElement CreateButton(string[] commandData)
-        {
-            var ribbonCommandButton = new XElement("RibbonCommandButton");
-            ribbonCommandButton.Add(new XAttribute("Text", commandData[0]));
-            ribbonCommandButton.Add(new XAttribute("ButtonStyle", commandData[4]));
-            ribbonCommandButton.Add(new XAttribute("MenuMacroID", commandData[1]));
-            return ribbonCommandButton;
         }
     }
 }
